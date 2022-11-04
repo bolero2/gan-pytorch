@@ -1,2 +1,8 @@
 DATASET:
-  path: /home/bulgogi/bolero/dataset/mnist/5
+  path: /home/bulgogi/bolero/dataset/mnist_png/training/5
+  img_size: [28, 28]
+
+TRAIN:
+  lr: 0.01
+  epochs: 300
+  batch_size: 8
