@@ -62,8 +62,6 @@ if __name__ == "__main__":
 
             d_output = d_model(data)
             g_output = g_model(rand_data)
-            # print(d_output.shape)
-            # print(g_output.shape)
 
             true_target = torch.ones(config['TRAIN']['batch_size'], 1).to(_device)
             fake_target = torch.zeros(config['TRAIN']['batch_size'], 1).to(_device)
@@ -81,12 +79,13 @@ if __name__ == "__main__":
 
             train_d_loss.append(d_loss)
             train_g_loss.append(g_loss)
-
-            print("[train %s/%3s] Epoch: %3s | Time: %6.2fs/it | discriminator_loss: %6.4f | generator_loss: %6.4f" % (
-                    step + 1, total_train_iter, epoch + 1, time.time() - iter_start, np.round(d_loss, 2), np.round(g_loss, 2)))
+            
+            if step % 100 == 0:
+                print("[train %s/%3s] Epoch: %3s | Time: %6.2fs/it | discriminator_loss: %6.4f | generator_loss: %6.4f" % (
+                        step + 1, total_train_iter, epoch + 1, time.time() - iter_start, np.round(d_loss, 2), np.round(g_loss, 2)))
         
         train_d_loss = np.round(sum(train_d_loss) / total_train_iter, 2)
         train_g_loss = np.round(sum(train_g_loss) / total_train_iter, 2)
 
         print("\n[Epoch {} training Ended] > Time: {:.2}s/epoch | Discriminator Loss: {:.4f} | Generator Loss: {:.4f}\n".format(
-                            epoch + 1, time.time() - epoch_start, train_d_loss, train_g_loss))
+                epoch + 1, time.time() - epoch_start, train_d_loss, train_g_loss))
