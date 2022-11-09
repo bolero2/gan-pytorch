@@ -6,31 +6,45 @@ class Discriminator(nn.Module):
     def __init__(self):
         super(Discriminator, self).__init__()
 
-        self.model = self.get_model()
+        self.linear1 = nn.Linear(784, 512)
+        self.linear2 = nn.Linear(512, 256)
+        self.linear3 = nn.Linear(256, 128)
+        self.linear4 = nn.Linear(128, 1)
+        self.relu = nn.ReLU()
+        self.sigmoid = nn.Sigmoid()
+    
+    def forward(self, x):
+        x = self.linear1(x)
+        x = self.relu(x)
+        x = self.linear2(x)
+        x = self.relu(x)
+        x = self.linear3(x)
+        x = self.relu(x)
+        x = self.linear4(x)
+        x = self.sigmoid(x)
 
-    def get_model(self):
-        model = nn.Sequential(
-            nn.Linear(784, 128),
-            nn.ReLU(),
-            nn.Linear(128, 1),
-            nn.Sigmoid()
-        )
-
-        return model
+        return x
 
 
 class Generator(nn.Module):
     def __init__(self):
         super(Generator, self).__init__()
 
-        self.model = self.get_model()
+        self.linear1 = nn.Linear(100, 128)
+        self.linear2 = nn.Linear(128, 256)
+        self.linear3 = nn.Linear(256, 512)
+        self.linear4 = nn.Linear(512, 784)
+        self.relu = nn.ReLU()
+        self.tanh = nn.Tanh()
+    
+    def forward(self, x):
+        x = self.linear1(x)
+        x = self.relu(x)
+        x = self.linear2(x)
+        x = self.relu(x)
+        x = self.linear3(x)
+        x = self.relu(x)
+        x = self.linear4(x)
+        x = self.tanh(x)
 
-    def get_model(self):
-        model = nn.Sequential(
-            nn.Linear(100, 128),
-            nn.ReLU(),
-            nn.Linear(128, 784),
-            nn.Tanh()
-        )
-
-        return model
+        return x
