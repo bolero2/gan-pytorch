@@ -5,6 +5,7 @@ import time
 import numpy as np
 from glob import glob
 from math import log
+from utils import *
 
 import torch
 from torch import nn
@@ -13,6 +14,7 @@ from torchvision.utils import save_image
 
 from models import Discriminator, Generator
 from custom import CustomDataset
+from matplotlib import pyplot as plt
 
 
 if __name__ == "__main__":
@@ -44,10 +46,11 @@ if __name__ == "__main__":
 
     criterion = nn.BCELoss()    # Binary Cross Entropy Loss (h(x), y)
 
-    d_optimizer = torch.optim.Adam(d_model.parameters(), lr=float(config['TRAIN']['lr']))
+    d_optimizer = torch.optim.Adam(d_model.parameters(), lr=float(config['TRAIN']['lr']) * 10)
     g_optimizer = torch.optim.Adam(g_model.parameters(), lr=float(config['TRAIN']['lr']))
 
     total_train_iter = len(dataloader)
+    d_loss_list, g_loss_list = [], []
 
     for epoch in range(config['TRAIN']['epochs']):
         epoch_start = time.time()
@@ -95,9 +98,14 @@ if __name__ == "__main__":
         train_d_loss = np.round(sum(train_d_loss) / total_train_iter, 2)
         train_g_loss = np.round(sum(train_g_loss) / total_train_iter, 2)
 
+        d_loss_list.append(train_d_loss)
+        g_loss_list.append(train_g_loss)
+
         print("\n[Epoch {} training Ended] > Time: {:.2}s/epoch | Discriminator Loss: {:.4f} | Generator Loss: {:.4f}\n".format(
                 epoch + 1, time.time() - epoch_start, train_d_loss, train_g_loss))
-        
+
+        get_losses_graph(x=[x for x in range(len(d_loss_list))], y=[d_loss_list, g_loss_list], labels=['Discriminator Loss', 'Generator Loss'])
+
         g_model = g_model.eval()
         with torch.no_grad():
             rand_data = np.random.normal(size=(1, 100))
