@@ -30,7 +30,7 @@ class Generator(nn.Module):
     def __init__(self):
         super(Generator, self).__init__()
 
-        self.linear1 = nn.Linear(100, 128)
+        self.linear1 = nn.Linear(1, 128)
         self.linear2 = nn.Linear(128, 256)
         self.linear3 = nn.Linear(256, 512)
         self.linear4 = nn.Linear(512, 784)
