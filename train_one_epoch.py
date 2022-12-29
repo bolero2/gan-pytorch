@@ -24,8 +24,13 @@ from tqdm import tqdm
 import pandas
 
 
-def generate_random(batch_size, depth):
-    random_data = np.random.normal(size=[batch_size, depth]).astype(np.float32)
+def generate_random_image(batch_size, depth):
+    random_data = np.random.rand(batch_size, depth).astype(np.float32)
+    random_data = torch.from_numpy(random_data)
+    return random_data
+
+def generate_random_seed(batch_size, depth):
+    random_data = np.random.randn(batch_size, depth).astype(np.float32)
     random_data = torch.from_numpy(random_data)
     return random_data
     
@@ -77,12 +82,12 @@ if __name__ == "__main__":
         true_target = torch.ones(batch_size, 1).to(_device)      # True  = 1
         fake_target = torch.zeros(batch_size, 1).to(_device)     # False = 0
 
-        d_loss = criterion(d_output, true_target) + criterion(d(g.forward(generate_random(batch_size, 1).to(_device))), fake_target)
+        d_loss = criterion(d_output, true_target) + criterion(d(g.forward(generate_random_seed(batch_size, 100).to(_device))), fake_target)
         d_optimizer.zero_grad()
         d_loss.backward()
         d_optimizer.step()
 
-        g_loss = criterion(d(g(generate_random(batch_size, 1).to(_device))), true_target)
+        g_loss = criterion(d(g(generate_random_seed(batch_size, 100).to(_device))), true_target)
         g_optimizer.zero_grad()
         g_loss.backward()
         g_optimizer.step()
@@ -98,10 +103,21 @@ if __name__ == "__main__":
 
     plt.figure(dpi=300)
     f, axarr = plt.subplots(2, 3, figsize=(16, 8))
-    for i in range(2):
-        for j in range(3):
-            output = g.forward(generate_random(1, 1))
-            img = output.detach().numpy().reshape(28, 28)
-            axarr[i, j].imshow(img, interpolation='none', cmap='Blues')
+
+    with torch.no_grad():
+        g = g.eval()
+        for i in range(2):
+            for j in range(3):
+                output = g.forward(generate_random_seed(1, 100))
+                img = output.detach().numpy().reshape(28, 28)
+                axarr[i, j].imshow(img, interpolation='none', cmap='Blues')
 
     plt.show()
+    torch.save(g.state_dict(), "generator.pt")
+    """
+    # load
+    
+    g = Generator()
+    g.load_state_dict(torch.load('generator.pt'))
+    g.eval()
+    """

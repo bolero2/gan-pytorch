@@ -6,8 +6,13 @@ import numpy as np
 from glob import glob
 from math import log
 from utils import *
-
 import torch
+from torch.utils.data import Dataset
+import numpy as np
+from PIL import Image
+from torchvision import transforms 
+import torch
+from random import shuffle
 from torch import nn
 from torch.utils.data import DataLoader
 from torchvision.utils import save_image
@@ -15,72 +20,80 @@ from torchvision.utils import save_image
 from models import Discriminator, Generator
 from custom import CustomDataset
 from matplotlib import pyplot as plt
+from tqdm import tqdm
+import pandas
 
+
+def generate_random_image(batch_size, depth):
+    random_data = np.random.rand(batch_size, depth).astype(np.float32)
+    random_data = torch.from_numpy(random_data)
+    return random_data
+
+def generate_random_seed(batch_size, depth):
+    random_data = np.random.randn(batch_size, depth).astype(np.float32)
+    random_data = torch.from_numpy(random_data)
+    return random_data
+    
+def read_inference_images(imagelist:list):
+    ret = []
+    img_size = [28, 28]
+
+    for imgname in imagelist:
+        img = Image.open(imgname).convert('L')
+        img = img.resize(img_size)
+        img = np.array(img).astype(np.float32)
+        img = img / 255.0
+        img = torch.from_numpy(img)
+        img = img.unsqueeze(0)
+        tensor = img.reshape([-1, img_size[0] * img_size[1]])
+
+        ret.append(tensor)
+
+    return ret
 
 if __name__ == "__main__":
     with open("config.yaml", 'r') as config:
         config = yaml.load(config, Loader=yaml.FullLoader)
 
-    is_cuda = torch.cuda.is_available()
-    _device = torch.device('cuda' if is_cuda else 'cpu')
+    _device = torch.device('cpu')
+    epochs = config['TRAIN']['epochs']
+    batch_size = config['TRAIN']['batch_size']
 
-    d_model = Discriminator()
-    g_model = Generator()
-
-    # d_model = discriminator.model
-    # g_model = generator.model
-
-    d_model = d_model.to(_device)
-    g_model = g_model.to(_device)
-
-    print("===== Discriminator ====")
-    print(d_model)
-    print("===== Generator ====")
-    print(g_model)
+    d = Discriminator().to(_device)
+    g = Generator().to(_device)
 
     datapath = config['DATASET']['path']
-    imgfiles = glob(os.path.join(datapath, "*.png"))
+    imgfiles = glob(os.path.join(datapath, "*.png"), recursive=True)
 
     dataset = CustomDataset(datapack=imgfiles, img_size=config['DATASET']['img_size'])
-    dataloader = DataLoader(dataset=dataset, batch_size=config['TRAIN']['batch_size'], drop_last=True)
+    dataloader = DataLoader(dataset=dataset, batch_size=batch_size, drop_last=True)
 
     criterion = nn.BCELoss()    # Binary Cross Entropy Loss (h(x), y)
 
-    d_optimizer = torch.optim.Adam(d_model.parameters(), lr=float(config['TRAIN']['lr']) * 10)
-    g_optimizer = torch.optim.Adam(g_model.parameters(), lr=float(config['TRAIN']['lr']))
+    d_optimizer = torch.optim.Adam(d.parameters(), lr=float(config['TRAIN']['lr']))
+    g_optimizer = torch.optim.Adam(g.parameters(), lr=float(config['TRAIN']['lr']))
 
-    total_train_iter = len(dataloader)
-    d_loss_list, g_loss_list = [], []
+    train_d_loss, train_g_loss = [], []
 
-    for epoch in range(config['TRAIN']['epochs']):
-        epoch_start = time.time()
-        train_d_loss, train_g_loss = [], []
+    for epoch in range(0, epochs):
+        
+        d = d.train()
+        g = g.train()
 
-        d_model = d_model.train()
-        g_model = g_model.train()
+        print(f"\nEpoch : {epoch}/{epochs}")
+        for step, data in tqdm(enumerate(dataloader), total=len(dataloader)):
+            data = data.reshape([batch_size, -1]).to(_device)
+            d_output = d(data)
 
-        for step, data in enumerate(dataloader):
-            iter_start = time.time()
-            data = data.reshape([config['TRAIN']['batch_size'], -1])
-            data = data.to(_device)
+            true_target = torch.ones(batch_size, 1).to(_device)      # True  = 1
+            fake_target = torch.zeros(batch_size, 1).to(_device)     # False = 0
 
-            rand_data = np.random.normal(size=(config['TRAIN']['batch_size'], 100))
-            rand_data = torch.from_numpy(rand_data).to(_device)
-            rand_data = rand_data.type(torch.float32)
-
-            d_output = d_model(data)
-            g_output = g_model(rand_data)
-
-            true_target = torch.ones(config['TRAIN']['batch_size'], 1).to(_device)      # True  = 1
-            fake_target = torch.zeros(config['TRAIN']['batch_size'], 1).to(_device)     # False = 0
-
-            d_loss = criterion(d_output, true_target) + criterion(d_model(g_output), fake_target)
-            # d_loss = criterion(log(d_output), true_target) + criterion(log(1 - d_model(g_output)), fake_target)
+            d_loss = criterion(d_output, true_target) + criterion(d(g.forward(generate_random_seed(batch_size, 100).to(_device))), fake_target)
             d_optimizer.zero_grad()
             d_loss.backward()
             d_optimizer.step()
 
-            g_loss = criterion(d_model(g_model(rand_data)), true_target)
+            g_loss = criterion(d(g(generate_random_seed(batch_size, 100).to(_device))), true_target)
             g_optimizer.zero_grad()
             g_loss.backward()
             g_optimizer.step()
@@ -90,28 +103,27 @@ if __name__ == "__main__":
 
             train_d_loss.append(d_loss)
             train_g_loss.append(g_loss)
-            
-            if step % 100 == 0:
-                print("[train %s/%3s] Epoch: %3s | Time: %6.2fs/it | discriminator_loss: %6.4f | generator_loss: %6.4f" % (
-                        step + 1, total_train_iter, epoch + 1, time.time() - iter_start, np.round(d_loss, 2), np.round(g_loss, 2)))
-        
-        train_d_loss = np.round(sum(train_d_loss) / total_train_iter, 2)
-        train_g_loss = np.round(sum(train_g_loss) / total_train_iter, 2)
+    
+    d_losses = get_losses_graph(x=[x for x in range(len(train_d_loss))], y=[train_d_loss], labels='D Loss', savename='D_loss')
+    g_losses = get_losses_graph(x=[x for x in range(len(train_g_loss))], y=[train_g_loss], labels='G Loss', savename='G_loss')
 
-        d_loss_list.append(train_d_loss)
-        g_loss_list.append(train_g_loss)
+    plt.figure(dpi=300)
+    f, axarr = plt.subplots(2, 3, figsize=(16, 8))
 
-        print("\n[Epoch {} training Ended] > Time: {:.2}s/epoch | Discriminator Loss: {:.4f} | Generator Loss: {:.4f}\n".format(
-                epoch + 1, time.time() - epoch_start, train_d_loss, train_g_loss))
+    with torch.no_grad():
+        g = g.eval()
+        for i in range(2):
+            for j in range(3):
+                output = g.forward(generate_random_seed(1, 100))
+                img = output.detach().numpy().reshape(28, 28)
+                axarr[i, j].imshow(img, interpolation='none', cmap='Blues')
 
-        get_losses_graph(x=[x for x in range(len(d_loss_list))], y=[d_loss_list, g_loss_list], labels=['Discriminator Loss', 'Generator Loss'])
-
-        g_model = g_model.eval()
-        with torch.no_grad():
-            rand_data = np.random.normal(size=(1, 100))
-            rand_data = torch.from_numpy(rand_data).to(_device)
-            rand_data = rand_data.type(torch.float32)
-
-            output = g_model(rand_data)
-            output = output.reshape(-1, 28, 28)
-            save_image(output, "saved.jpg")
+    plt.show()
+    torch.save(g.state_dict(), "generator.pt")
+    """
+    # load
+    
+    g = Generator()
+    g.load_state_dict(torch.load('generator.pt'))
+    g.eval()
+    """
