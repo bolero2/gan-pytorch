@@ -55,7 +55,7 @@ if __name__ == "__main__":
     with open("config.yaml", 'r') as config:
         config = yaml.load(config, Loader=yaml.FullLoader)
 
-    _device = torch.device('cpu')
+    _device = torch.device('cuda:0')
     epochs = config['TRAIN']['epochs']
     batch_size = config['TRAIN']['batch_size']
 
@@ -114,7 +114,7 @@ if __name__ == "__main__":
         g = g.eval()
         for i in range(2):
             for j in range(3):
-                output = g.forward(generate_random_seed(1, 100))
+                output = g.forward(generate_random_seed(1, 100).to(_device))
                 img = output.detach().numpy().reshape(28, 28)
                 axarr[i, j].imshow(img, interpolation='none', cmap='Blues')
 
